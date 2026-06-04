@@ -4,6 +4,7 @@ CHANGELOG
 0.9
 ---
 
+ * Add streaming structured output, combining `Capability::OUTPUT_STREAMING` and `Capability::OUTPUT_STRUCTURED`: an incremental JSON stream decoder emits loose `PartialObjectDelta` snapshots while the response streams and a single fully typed `ObjectCompleteDelta` at stream end, consumable via `DeferredResult::asObjectStream()`
  * Add `ValidatorSubscriber` to validate structured output using Symfony Validator
  * Add support for multiple system messages in `MessageBag`
  * [BC BREAK] Rework `AssistantMessage` to hold `ContentInterface` parts (variadic constructor) instead of a single string content plus separate tool-call/thinking fields. Adds `Message\Content\Thinking`, `Message\Content\ExecutableCode`, and `Message\Content\CodeExecution` content classes, and makes `Result\ToolCall` implement `ContentInterface`. `Message::ofAssistant()` accepts strings, `ContentInterface`, and `ResultInterface` values, mapping `TextResult`/`ThinkingResult`/`ToolCallResult`/`ExecutableCodeResult`/`CodeExecutionResult`/`MultiPartResult` to their content equivalents; result types without a known mapping throw `InvalidArgumentException` so unhandled cases surface instead of being silently dropped.
