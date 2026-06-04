@@ -16,6 +16,8 @@ use Symfony\AI\Platform\Exception\UnexpectedResultTypeException;
 use Symfony\AI\Platform\Metadata\MetadataAwareTrait;
 use Symfony\AI\Platform\Metadata\StreamListener as MetaDataStreamListener;
 use Symfony\AI\Platform\Reranking\RerankingEntry;
+use Symfony\AI\Platform\Result\Stream\Delta\ObjectCompleteDelta;
+use Symfony\AI\Platform\Result\Stream\Delta\PartialObjectDelta;
 use Symfony\AI\Platform\Result\Stream\Delta\TextDelta;
 use Symfony\AI\Platform\ResultConverterInterface;
 use Symfony\AI\Platform\TokenUsage\StreamListener as TokenUsageStreamListener;
@@ -194,6 +196,25 @@ final class DeferredResult
             }
 
             yield $delta;
+        }
+    }
+
+    /**
+     * Streams structured output following the two-tier data contract: zero or more loose {@see PartialObjectDelta}
+     * snapshots while the document arrives, then exactly one {@see ObjectCompleteDelta} carrying the typed,
+     * validated object at stream termination (the terminal object is delivered through that final delta, since the
+     * underlying result is a stream rather than an {@see ObjectResult}).
+     *
+     * @return \Generator<PartialObjectDelta|ObjectCompleteDelta>
+     *
+     * @throws ExceptionInterface
+     */
+    public function asObjectStream(): \Generator
+    {
+        foreach ($this->asStream() as $delta) {
+            if ($delta instanceof PartialObjectDelta || $delta instanceof ObjectCompleteDelta) {
+                yield $delta;
+            }
         }
     }
 

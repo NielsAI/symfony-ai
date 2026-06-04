@@ -31,6 +31,11 @@ use Symfony\AI\Platform\Exception\InvalidArgumentException;
  */
 final class JsonStreamDecoder
 {
+    /**
+     * @var \Generator<int, ProgressEvent|Suspended, mixed, mixed>|null
+     */
+    private ?\Generator $run = null;
+
     public function __construct(
         private readonly StreamCursor $cursor,
         private readonly JsonTokenizer $tokenizer,
@@ -47,6 +52,55 @@ final class JsonStreamDecoder
     }
 
     /**
+     * Starts (or restarts) the decode coroutine. Call before {@see feed()}/{@see close()}.
+     */
+    public function open(): void
+    {
+        $this->run = $this->decode();
+    }
+
+    /**
+     * Pushes a fragment and resumes the coroutine, returning the progress produced before it starved again.
+     *
+     * @return list<ProgressEvent>
+     */
+    public function feed(string $fragment): array
+    {
+        $this->cursor->push($fragment);
+
+        return $this->pump();
+    }
+
+    /**
+     * Signals end-of-stream and drains any remaining progress.
+     *
+     * @return list<ProgressEvent>
+     */
+    public function close(): array
+    {
+        $this->cursor->end();
+
+        return $this->pump();
+    }
+
+    public function isComplete(): bool
+    {
+        return null !== $this->run && !$this->run->valid();
+    }
+
+    /**
+     * The decoded loose value (only meaningful once {@see isComplete()} is true).
+     */
+    public function result(): mixed
+    {
+        if (null === $this->run) {
+            throw new IncompleteJsonException('The decoder has not been started.');
+        }
+
+        return $this->run->getReturn();
+    }
+
+    /**
      * Convenience driver: feeds all fragments, then closes the stream, and returns the decoded loose value.
      *
      * @param iterable<string>                    $chunks
@@ -56,21 +110,29 @@ final class JsonStreamDecoder
      */
     public function decodeAll(iterable $chunks, ?callable $onProgress = null): mixed
     {
-        $run = $this->decode();
+        $forward = static function (array $events) use ($onProgress): void {
+            if (null === $onProgress) {
+                return;
+            }
+
+            foreach ($events as $event) {
+                $onProgress($event);
+            }
+        };
+
+        $this->open();
 
         foreach ($chunks as $chunk) {
-            $this->cursor->push($chunk);
-            $this->drain($run, $onProgress);
+            $forward($this->feed($chunk));
         }
 
-        $this->cursor->end();
-        $this->drain($run, $onProgress);
+        $forward($this->close());
 
-        if ($run->valid()) {
+        if (!$this->isComplete()) {
             throw new IncompleteJsonException('Streamed JSON ended before the document was complete.');
         }
 
-        return $run->getReturn();
+        return $this->result();
     }
 
     /**
@@ -88,32 +150,39 @@ final class JsonStreamDecoder
 
     /**
      * Resumes the decode coroutine until it either completes or genuinely starves (suspended with no buffered
-     * input and no end-of-stream signal yet). Progress events are forwarded to the optional callback.
+     * input and no end-of-stream signal yet), collecting the progress events emitted along the way.
      *
-     * @param \Generator<int, ProgressEvent|Suspended, mixed, mixed> $run
-     * @param (callable(ProgressEvent):void)|null                    $onProgress
+     * @return list<ProgressEvent>
      */
-    private function drain(\Generator $run, ?callable $onProgress): void
+    private function pump(): array
     {
-        while ($run->valid()) {
-            $yielded = $run->current();
+        if (null === $this->run) {
+            throw new IncompleteJsonException('The decoder has not been started.');
+        }
+
+        $events = [];
+
+        while ($this->run->valid()) {
+            $yielded = $this->run->current();
 
             if ($yielded instanceof Suspended) {
                 if (!$this->cursor->hasBuffered() && !$this->cursor->isEnded()) {
-                    return;
+                    break;
                 }
 
-                $run->next();
+                $this->run->next();
 
                 continue;
             }
 
-            if ($yielded instanceof ProgressEvent && null !== $onProgress) {
-                $onProgress($yielded);
+            if ($yielded instanceof ProgressEvent) {
+                $events[] = $yielded;
             }
 
-            $run->next();
+            $this->run->next();
         }
+
+        return $events;
     }
 
     /**

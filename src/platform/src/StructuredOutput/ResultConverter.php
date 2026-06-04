@@ -18,11 +18,15 @@ use Symfony\AI\Platform\Result\MultiPartResult;
 use Symfony\AI\Platform\Result\ObjectResult;
 use Symfony\AI\Platform\Result\RawResultInterface;
 use Symfony\AI\Platform\Result\ResultInterface;
+use Symfony\AI\Platform\Result\StreamResult;
 use Symfony\AI\Platform\Result\TextResult;
 use Symfony\AI\Platform\ResultConverterInterface;
+use Symfony\AI\Platform\StructuredOutput\Streaming\ChannelDemux;
+use Symfony\AI\Platform\StructuredOutput\Streaming\StructuredOutputStreamListener;
 use Symfony\AI\Platform\TokenUsage\TokenUsageExtractorInterface;
 use Symfony\Component\Serializer\Exception\ExceptionInterface as SerializerExceptionInterface;
 use Symfony\Component\Serializer\Normalizer\AbstractNormalizer;
+use Symfony\Component\Serializer\Normalizer\DenormalizerInterface;
 use Symfony\Component\Serializer\SerializerInterface;
 
 final class ResultConverter implements ResultConverterInterface
@@ -44,6 +48,10 @@ final class ResultConverter implements ResultConverterInterface
     {
         $innerResult = $this->innerConverter->convert($result, $options);
 
+        if ($innerResult instanceof StreamResult) {
+            return $this->attachStreamListener($innerResult);
+        }
+
         if ($innerResult instanceof TextResult) {
             return $this->convertTextToObject($innerResult, $result);
         }
@@ -62,6 +70,25 @@ final class ResultConverter implements ResultConverterInterface
     public function getTokenUsageExtractor(): ?TokenUsageExtractorInterface
     {
         return $this->innerConverter->getTokenUsageExtractor();
+    }
+
+    /**
+     * Streaming structured output: instead of one-shot decoding, attach the listener that progressively decodes
+     * the loose tree (emitting {@see \Symfony\AI\Platform\Result\Stream\Delta\PartialObjectDelta}s) and performs
+     * the single terminal denormalization at stream end ({@see \Symfony\AI\Platform\Result\Stream\Delta\ObjectCompleteDelta}).
+     */
+    private function attachStreamListener(StreamResult $stream): StreamResult
+    {
+        $denormalizer = $this->serializer instanceof DenormalizerInterface ? $this->serializer : null;
+
+        $stream->addListener(new StructuredOutputStreamListener(
+            new ChannelDemux(),
+            $denormalizer,
+            $this->outputType,
+            $this->objectToPopulate,
+        ));
+
+        return $stream;
     }
 
     private function convertTextToObject(TextResult $textResult, RawResultInterface $result): ObjectResult

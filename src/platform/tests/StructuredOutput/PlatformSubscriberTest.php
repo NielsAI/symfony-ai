@@ -346,17 +346,31 @@ final class PlatformSubscriberTest extends TestCase
         $this->assertSame('Kai Wegner', $result->mayor);
     }
 
-    public function testObjectInstanceThrowsExceptionWithStreaming()
+    public function testStreamingStructuredOutputIsAllowedWhenModelSupportsStreaming()
     {
-        $this->expectException(\Symfony\AI\Platform\Exception\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Streamed responses are not supported for structured output.');
+        $processor = new PlatformSubscriber(new ConfigurableResponseFormatFactory(['some' => 'format']));
+
+        $model = new Model('gpt-4', [Capability::OUTPUT_STRUCTURED, Capability::OUTPUT_STREAMING]);
+        $event = new InvocationEvent($model, new MessageBag(), [
+            'response_format' => SomeStructure::class,
+            'stream' => true,
+        ]);
+
+        $processor->processInput($event);
+
+        $this->assertSame(['response_format' => ['some' => 'format'], 'stream' => true], $event->getOptions());
+    }
+
+    public function testStreamingStructuredOutputThrowsWhenModelDoesNotSupportStreaming()
+    {
+        $this->expectException(MissingModelSupportException::class);
+        $this->expectExceptionMessage('does not support "streaming"');
 
         $processor = new PlatformSubscriber(new ConfigurableResponseFormatFactory());
 
-        $city = new City(name: 'Berlin');
         $model = new Model('gpt-4', [Capability::OUTPUT_STRUCTURED]);
         $event = new InvocationEvent($model, new MessageBag(), [
-            'response_format' => $city,
+            'response_format' => SomeStructure::class,
             'stream' => true,
         ]);
 
