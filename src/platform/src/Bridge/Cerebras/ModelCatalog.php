@@ -26,23 +26,17 @@ final class ModelCatalog extends AbstractModelCatalog
      */
     public function __construct(array $additionalModels = [])
     {
+        // STATIC LIST START
+        // This list is generated from external metadata. Run dev/update-model-catalogs.php to refresh it.
         $defaultModels = [
-            'llama-4-scout-17b-16e-instruct' => [
+            'gpt-oss-120b' => [
                 'class' => Model::class,
                 'capabilities' => [
                     Capability::INPUT_MESSAGES,
                     Capability::OUTPUT_STRUCTURED,
                     Capability::OUTPUT_TEXT,
                     Capability::OUTPUT_STREAMING,
-                ],
-            ],
-            'llama3.1-8b' => [
-                'class' => Model::class,
-                'capabilities' => [
-                    Capability::INPUT_MESSAGES,
-                    Capability::OUTPUT_STRUCTURED,
-                    Capability::OUTPUT_TEXT,
-                    Capability::OUTPUT_STREAMING,
+                    Capability::TOOL_CALLING,
                 ],
             ],
             'llama-3.3-70b' => [
@@ -63,14 +57,22 @@ final class ModelCatalog extends AbstractModelCatalog
                     Capability::OUTPUT_STREAMING,
                 ],
             ],
-            'qwen-3-32b' => [
+            'llama-4-scout-17b-16e-instruct' => [
                 'class' => Model::class,
                 'capabilities' => [
                     Capability::INPUT_MESSAGES,
                     Capability::OUTPUT_STRUCTURED,
                     Capability::OUTPUT_TEXT,
                     Capability::OUTPUT_STREAMING,
-                    Capability::TOOL_CALLING,
+                ],
+            ],
+            'llama3.1-8b' => [
+                'class' => Model::class,
+                'capabilities' => [
+                    Capability::INPUT_MESSAGES,
+                    Capability::OUTPUT_STRUCTURED,
+                    Capability::OUTPUT_TEXT,
+                    Capability::OUTPUT_STREAMING,
                 ],
             ],
             'qwen-3-235b-a22b-instruct-2507' => [
@@ -91,6 +93,16 @@ final class ModelCatalog extends AbstractModelCatalog
                     Capability::OUTPUT_STREAMING,
                 ],
             ],
+            'qwen-3-32b' => [
+                'class' => Model::class,
+                'capabilities' => [
+                    Capability::INPUT_MESSAGES,
+                    Capability::OUTPUT_STRUCTURED,
+                    Capability::OUTPUT_TEXT,
+                    Capability::OUTPUT_STREAMING,
+                    Capability::TOOL_CALLING,
+                ],
+            ],
             'qwen-3-coder-480b' => [
                 'class' => Model::class,
                 'capabilities' => [
@@ -100,14 +112,16 @@ final class ModelCatalog extends AbstractModelCatalog
                     Capability::OUTPUT_STREAMING,
                 ],
             ],
-            'gpt-oss-120b' => [
+            'qwen-3.8-27b' => [
                 'class' => Model::class,
                 'capabilities' => [
                     Capability::INPUT_MESSAGES,
-                    Capability::OUTPUT_STRUCTURED,
                     Capability::OUTPUT_TEXT,
                     Capability::OUTPUT_STREAMING,
                     Capability::TOOL_CALLING,
+                    Capability::OUTPUT_STRUCTURED,
+                    Capability::THINKING,
+                    Capability::INPUT_IMAGE,
                 ],
             ],
             'zai-glm-4.7' => [
@@ -121,6 +135,7 @@ final class ModelCatalog extends AbstractModelCatalog
                 ],
             ],
         ];
+        // STATIC LIST END
 
         $this->models = array_merge($defaultModels, $additionalModels);
     }
